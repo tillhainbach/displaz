@@ -63,6 +63,7 @@ int main(int argc, char* argv[])
         // Slave process.  This is what we're trying to test.
         InterProcessLock lk("InterProcessLock_test");
         if (!lk.tryLock())
+            std::cerr << "line 66 fails bla bla bla bla\n";
             return 1;
         // We have the lock: sleep to let other processes exit
         milliSleep(4000);

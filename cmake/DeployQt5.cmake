@@ -218,7 +218,6 @@ function(install_qt5_plugin_path plugin executable copy installed_plugin_path_va
         set(plugins_path "${plugins_path}/${plugins_dir}")
       endif()
     endif()
-
     set(plugin_group "")
 
     get_filename_component(plugin_path "${plugin}" PATH)
@@ -226,6 +225,7 @@ function(install_qt5_plugin_path plugin executable copy installed_plugin_path_va
     get_filename_component(plugin_parent_dir_name "${plugin_parent_path}" NAME)
     get_filename_component(plugin_name "${plugin}" NAME)
     string(TOLOWER "${plugin_parent_dir_name}" plugin_parent_dir_name)
+
 
     if("${plugin_parent_dir_name}" STREQUAL "plugins")
       get_filename_component(plugin_group "${plugin_path}" NAME)
@@ -311,6 +311,7 @@ function(install_qt5_executable executable)
     set(qt_plugins_dir "")
   endif()
 
+
   if(QT_IS_STATIC)
     message(WARNING "Qt built statically: not installing plugins.")
   else()
@@ -318,7 +319,7 @@ function(install_qt5_executable executable)
       get_property(loc TARGET Qt5::QCocoaIntegrationPlugin
         PROPERTY LOCATION_RELEASE)
       install_qt5_plugin("${loc}" "${executable}" 0 installed_plugin_paths
-        "${plugins_dir}/platforms" "${component}")
+        "${plugins_dir}" "${component}")
       list(APPEND libs ${installed_plugin_paths})
     elseif(WIN32)
       get_property(loc TARGET Qt5::QWindowsIntegrationPlugin

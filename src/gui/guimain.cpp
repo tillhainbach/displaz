@@ -26,14 +26,7 @@ class GeometryMutator;
 static void setupQFileSearchPaths()
 {
     QString installBinDir = QCoreApplication::applicationDirPath();
-    if (!installBinDir.endsWith("/bin"))
-    {
-        std::cerr << "WARNING: strange install location detected "
-                     "- shaders will not be found\n";
-        return;
-    }
-    QString installBaseDir = installBinDir;
-    installBaseDir.chop(4);
+    QString installBaseDir = installBinDir.mid(0, installBinDir.indexOf("/",-7));
     QDir::addSearchPath("shaders", installBaseDir + "/" + DISPLAZ_SHADER_DIR);
     QDir::addSearchPath("doc", installBaseDir + "/" + DISPLAZ_DOC_DIR);
 }

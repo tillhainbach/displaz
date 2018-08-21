@@ -44,13 +44,53 @@ mark_as_advanced(DISPLAZ_BUILD_NUMBER)
 #------------------------------------------------------------------------------
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
-# More handy location for intermediate build artifacts
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+include(InstallLocation)
+include(BuildLocation)
 
 if (DISPLAZ_USE_TESTS)
     enable_testing()
+endif()
+
+#------------------------------------------------------------------------------
+# Determine current displaz version
+include(GitUtils)
+set(displazVersion "0.3")
+if (GIT_FOUND)
+    git_describe(displazVersionGit)
+    if (displazVersionGit)
+        # For better or worse, I've been tagging as v0.1 - strip off the "v"
+        string(REGEX REPLACE "^v" "" displazVersion "${displazVersionGit}")
+    else()
+        #if something fails, hardcode version number
+        set (displaz_VERSION_MAJOR "0")
+        set (displaz_VERSION_MINOR "4")
+        set (displaz_VERSION_PATCH "0")
+        set (displazVersion ${displaz_VERSION_MAJOR}.${displaz_VERSION_MINOR}.${displaz_VERSION_PATCH})
+    endif()
+    message(STATUS "Building displaz version ${displazVersion}")
+else()
+    message(WARNING "Git not found - assuming hardcoded version ${displazVersion}")
+endif()
+
+#------------------------------------------------------------------------------
+# set up MACOSX BUNDLE stuff
+if(APPLE)
+  set(qtpath "${CMAKE_PREFIX_PATH}")
+  set(MACOSX_BUNDLE_NAME "Displaz")
+  set(prefix "${MACOSX_BUNDLE_NAME}.app/Contents")
+  set(INSTALL_INCLUDE_DIR "${prefix}/${INSTALL_INCLUDE_DIR}")
+  set(INSTALL_RUNTIME_DIR "${prefix}/MacOS")
+  set(INSTALL_LIBRARY_DIR "${prefix}/${INSTALL_LIBRARY_DIR}")
+  set(INSTALL_ARCHIVE_DIR "${prefix}/${INSTALL_ARCHIVE_DIR}")
+  set(INSTALL_DATA_DIR    "${prefix}/${INSTALL_DATA_DIR}")
+  set(INSTALL_DOC_DIR     "${prefix}/${INSTALL_DOC_DIR}")
+  set(INSTALL_CMAKE_DIR   "${prefix}/Resources")
+  #set binary directory for Apple, specific for app bundle
+  set(DISPLAZ_BIN_DIR ".")
+endif()
+
+if(NOT APPLE)
+  set(DISPLAZ_BIN_DIR "bin")
 endif()
 
 #------------------------------------------------------------------------------
@@ -91,6 +131,9 @@ endif()
 
 find_package(OpenGL REQUIRED)
 
+#------------------------------------------------------------------------------
+#find QT stuff
+
 if (DISPLAZ_USE_QT4)
     find_package(Qt4 4.7 COMPONENTS QtCore QtGui QtNetwork QtOpenGL REQUIRED)
     add_definitions(-DDISPLAZ_USE_QT4)
@@ -106,55 +149,62 @@ else ()
     add_definitions(${Qt5Widgets_DEFINITIONS})
 
     if (NOT WIN32)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Qt5Core_EXECUTABLE_COMPILE_FLAGS} ${Qt5Gui_EXECUTABLE_COMPILE_FLAGS} ${Qt5Network_EXECUTABLE_COMPILE_FLAGS} ${Qt5OpenGL_EXECUTABLE_COMPILE_FLAGS} ${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
+                                ${Qt5Core_EXECUTABLE_COMPILE_FLAGS} \
+                                ${Qt5Gui_EXECUTABLE_COMPILE_FLAGS} \
+                                ${Qt5Network_EXECUTABLE_COMPILE_FLAGS} \
+                                ${Qt5OpenGL_EXECUTABLE_COMPILE_FLAGS} \
+                                ${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
     endif()
 endif()
 
 
 include_directories(${ILMBASE_INCLUDE_DIRS})
 
-
 #------------------------------------------------------------------------------
 # Install directory for binaries
 # (It would seem sensible to avoid a bin directory on windows, but in practise
 # the NSIS installer expects binaries to be there.)
-set(DISPLAZ_BIN_DIR "bin")
+
+
+
+
 if (WIN32)
     set(DISPLAZ_SHADER_DIR "shaders")
     set(DISPLAZ_DOC_DIR "doc")
+elseif(APPLE)
+    set(DISPLAZ_SHADER_DIR "Resources/shaders")
+    set(DISPLAZ_DOC_DIR "Resources/doc")
 else()
     set(DISPLAZ_SHADER_DIR "share/displaz/shaders")
     set(DISPLAZ_DOC_DIR "share/doc/displaz")
 endif()
 
-
-#------------------------------------------------------------------------------
-# Determine current displaz version
-include(GitUtils)
-set(displazVersion "0.3")
-if (GIT_FOUND)
-    git_describe(displazVersionGit)
-    if (displazVersionGit)
-        # For better or worse, I've been tagging as v0.1 - strip off the "v"
-        string(REGEX REPLACE "^v" "" displazVersion "${displazVersionGit}")
-    endif()
-    message(STATUS "Building displaz version ${displazVersion}")
-else()
-    message(WARNING "Git not found - assuming hardcoded version ${displazVersion}")
-endif()
-
-
 #------------------------------------------------------------------------------
 # Build sources
+# Ensure we can find NSIS.InstallOptions.ini.in
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/package")
 add_subdirectory(src)
+
 
 
 #------------------------------------------------------------------------------
 # Create remainder of install tree
-install(DIRECTORY test/ DESTINATION "${DISPLAZ_DOC_DIR}/examples")
-install(DIRECTORY shaders/ DESTINATION "${DISPLAZ_SHADER_DIR}")
-install(DIRECTORY thirdparty/licenses/ DESTINATION "${DISPLAZ_DOC_DIR}/thirdparty_licenses")
-
+if (APPLE)
+    install(DIRECTORY test/
+            DESTINATION "${prefix}/${DISPLAZ_DOC_DIR}/examples")
+    install(DIRECTORY shaders/
+            DESTINATION "${prefix}/${DISPLAZ_SHADER_DIR}")
+    install(DIRECTORY thirdparty/licenses/
+            DESTINATION "${prefix}/${DISPLAZ_DOC_DIR}/thirdparty_licenses")
+else()
+    install(DIRECTORY test/
+            DESTINATION "${DISPLAZ_DOC_DIR}/examples")
+    install(DIRECTORY shaders/
+            DESTINATION "${DISPLAZ_SHADER_DIR}")
+    install(DIRECTORY thirdparty/licenses/
+            DESTINATION "${DISPLAZ_DOC_DIR}/thirdparty_licenses")
+endif()
 
 #------------------------------------------------------------------------------
 # Documentation
@@ -171,7 +221,11 @@ if (RST2HTML)
         DEPENDS doc/userguide.rst
     )
     add_custom_target(doc ALL DEPENDS ${readmeHtml} ${userguideHtml})
+    if(APPLE)
+    install(FILES ${readmeHtml} ${userguideHtml} DESTINATION "${prefix}/${DISPLAZ_DOC_DIR}")
+    else()
     install(FILES ${readmeHtml} ${userguideHtml} DESTINATION "${DISPLAZ_DOC_DIR}")
+    endif()
 else()
     message(WARNING "rst2html not found - documentation will be installed as text!")
     install(FILES README.rst DESTINATION "${DISPLAZ_DOC_DIR}")
@@ -182,31 +236,9 @@ endif()
 #------------------------------------------------------------------------------
 # Packaging, mostly just for windows at this stage.
 
-# Ensure we can find NSIS.InstallOptions.ini.in
-list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/package")
-
-set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION "${DISPLAZ_BIN_DIR}")
-include(InstallRequiredSystemLibraries)
-
-set(CPACK_PACKAGE_NAME "displaz")
-set(CPACK_PACKAGE_VENDOR "Displaz Team")
-set(CPACK_PACKAGE_VERSION "${displazVersion}+${DISPLAZ_BUILD_NUMBER}")
-set(fullVersion "displaz-${displazVersion}")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A viewer for geospatial lidar data")
-set(CPACK_PACKAGE_DESCRIPTION_FILE "${PROJECT_SOURCE_DIR}/README.rst")
-set(CPACK_RESOURCE_FILE_README "${PROJECT_SOURCE_DIR}/README.rst")
-set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE.txt")
-set(CPACK_PACKAGE_INSTALL_DIRECTORY "Displaz")
 if (WIN32)
-    # Some paths need at at least one backslash to workaround NSIS bug
-    set(CPACK_PACKAGE_ICON "${CMAKE_SOURCE_DIR}/package\\\\displaz.ico")
-    set(CPACK_NSIS_MUI_ICON "${CMAKE_SOURCE_DIR}/package\\\\displaz.ico")
-else()
-    set(CPACK_PACKAGE_ICON "${CMAKE_SOURCE_DIR}/package/displaz.ico")
-endif()
-set(CPACK_PACKAGE_EXECUTABLES "displaz;Displaz")
-set(CPACK_MONOLITHIC_INSTALL TRUE)
-if (WIN32)
+    set(CPACK_MONOLITHIC_INSTALL TRUE)
+    set(CPACK_STRIP_FILES TRUE)
     # NSIS Setup
     set(CPACK_GENERATOR NSIS)
     set(CPACK_NSIS_MODIFY_PATH TRUE)
@@ -235,8 +267,16 @@ if (WIN32)
     set(CPACK_NSIS_INSTALL_ROOT "C:\\\\Program Files")
 else()
     set(CPACK_GENERATOR TGZ)
+    set(CPACK_STRIP_FILES TRUE)
 endif()
-set(CPACK_STRIP_FILES TRUE)
 
-include(CPack)
 
+if(APPLE)
+    set(CPACK_GENERATOR "DragNDrop")
+    set(CPACK_DMG_FORMAT "UDBZ")
+    set(CPACK_DMG_VOLUME_NAME "displaz")
+    set(CPACK_SYSTEM_NAME "OSX")
+    set(CPACK_PACKAGE_FILE_NAME "displaz")
+endif()
+
+include(DisplazCPack)

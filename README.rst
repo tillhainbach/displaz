@@ -91,8 +91,8 @@ Troubleshooting:
   "undefined reference to qt_version_tag", or some other qt library-related
   link error.  For example having the qt version distributed with the python
   package system ``conda`` has been known to cause issues, which can be solved
-  by removing it from the ``$PATH`` variable *before* calling cmake in the
-  script above.
+  by unloading it from the path before calling the make steps in the script
+  above.
 
 
 Windows x64
@@ -144,9 +144,30 @@ above from the x64 cross tools command prompt.
 OSX
 ~~~
 
-TODO - for the moment see the generic build instructions below.  Also note that
-displaz is regularly built on OSX via travis-CI, so the commands in the file
-``.travis.yml`` in the repository should more or less work.
+The following commands may be used to build displaz packed as dmg on mac:
+
+    # Get the source code
+    git clone https://github.com/tillhainbach/displaz.git
+    cd displaz
+
+    # Build LASlib and ilmbase
+    mkdir build_external
+    cd build_external
+    cmake ../thirdparty/external
+    make -j4
+    cd ..
+
+    # Build displaz
+    mkdir build
+    cd build
+    cmake .. -DCMAKE_PREFIX_PATH=PATH/TO/QT
+    cpack -G DragNDrop
+
+To make the displaz.app behave like a macOS app own has to has a copy the launcher
+bash script to the macOS Bundle and change the info.plist files.
+copy the Displaz.app inside displaz.dmg to the source directory (most likely "displaz")
+then run the "FixUpDisplaz" executable.
+
 
 
 Generic build
@@ -169,6 +190,22 @@ will need to install the following manually:
 
 Both the LASlib and IlmBase libraries may be built using the separate third
 party build system in ``thirdparty/external/CMakeLists.txt``.
+
+
+Build options
+~~~~~~~~~~~~~
+To read the .las and .laz file formats, you'll need one of the following:
+
+* LASlib >= something-recent (known to work with 150406).  This is the default
+  because it's reasonably fast and has no additional library dependencies.
+* PDAL >= something-recent (known to work with 0.1.0-3668-gff73c08).  You may
+  select PDAL by setting the build option ``DISPLAZ_USE_PDAL=TRUE``.  Note that
+  building PDAL also requires several libraries including boost, laszip and
+  GDAL.
+
+If you only want to read ply files (for example, to use the scripting language
+bindings), and don't care about las you may set the build option
+``DISPLAZ_USE_LAS=FALSE``.
 
 
 Supported Systems
@@ -194,4 +231,3 @@ third party projects are gratefully acknowledged:
 * rply - http://www.impa.br/~diego/software/rply
 * GLEW - http://glew.sourceforge.net/
 * Small pieces from OpenImageIO - http://openimageio.org
-

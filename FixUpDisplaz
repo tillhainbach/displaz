@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+#change Info.plist
+sed -e '8s#.*#<string>launcher</string>#' -i '' Displaz.app/Contents/Info.plist
+
+#copy launcher executable into MacOS bundle
+cp launcher Displaz.app/Contents/MacOS

@@ -127,21 +127,50 @@ else()
     qt5_add_resources(RCC_GENERATED resource.qrc)
 endif()
 
-if(WIN32)
-    list(APPEND gui_srcs ../package/windows_resources.rc)
-endif()
-
-if(WIN32)
-    add_definitions(-DNOMINMAX -D_USE_MATH_DEFINES -D_CRT_SECURE_NO_WARNINGS)
-endif()
-
+#------------------------------------------------------------------------------
 # Create config.h
 set(DISPLAZ_VERSION_STRING "${displazVersion}")
 configure_file(config.h.in.cmake config.h @ONLY)
 include_directories(${PROJECT_BINARY_DIR})
 
+#------------------------------------------------------------------------------
+# Handle Mac OS X specific icons etc.
 
-add_executable(displaz WIN32 ${gui_srcs} ${RCC_GENERATED})
+if (APPLE)
+    set(CMAKE_EXE_LINKER_FLAGS "-framework Foundation -framework Cocoa")
+    set(myApp_ICON "../package/displaz.icns")
+    #list(APPEND avogadro_srcs "../package/displaz.icns")
+    set(MACOSX_BUNDLE_ICON_FILE "displaz.icns")
+    set(MACOSX_BUNDLE_BUNDLE_VERSION "${displazVERSION}")
+    set(MACOSX_BUNDLE_INFO_STRING "displaz - version ${displazVERSION}")
+    set(MACOSX_BUNDLE_GUI_IDENTIFIER "cc.displaz")
+    set(MACOSX_BUNDLE_BUNDLE_NAME "${MACOSX_BUNDLE_NAME}")
+
+    # Change following line to point to actual icns file in bundle.
+    set_source_files_properties(${myApp_ICON} PROPERTIES
+      MACOSX_PACKAGE_LOCATION "Resources")
+
+# add icon handling for linux here
+#elseif(UNIX)
+
+elseif(WIN32)
+    list(APPEND gui_srcs ../package/windows_resources.rc)
+      add_definitions(-DNOMINMAX -D_USE_MATH_DEFINES -D_CRT_SECURE_NO_WARNINGS)
+endif()
+
+#include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+
+if (WIN32)
+    add_executable(displaz WIN32 ${gui_srcs} ${RCC_GENERATED})
+elseif(APPLE)
+    add_executable(displaz MACOSX_BUNDLE ${myApp_ICON} ${gui_srcs} ${RCC_GENERATED})
+    #CPack copies Qt.Frameworks while packaging
+    set_target_properties(displaz PROPERTIES INSTALL_RPATH
+    "${qtpath}/lib")
+endif()
+
+#-------------------- WIN32 specific stuff ------------------------------------
+
 if (WIN32)
     # For windows, create a version of displaz which is linked as a console
     # program (ie, without WIN32 flag) in order have good behaviour from the
@@ -162,7 +191,7 @@ if (WIN32)
     )
 endif()
 
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # Library dependencies
 if (DISPLAZ_USE_QT4)
     target_link_libraries(displaz
@@ -190,16 +219,12 @@ else()
         endif()
     endif()
     # TODO this is a workaround for Ubuntu 16.04 x86-64
-    if (UNIX)
+    if (UNIX AND NOT APPLE)
         add_definitions(-fPIC)
     endif()
 endif()
 
-if(APPLE)
-    target_link_libraries(displaz
-        ${FOUNDATION_LIBRARY} ${COCOA_LIBRARY}
-    )
-endif()
+
 
 if (DISPLAZ_USE_LAS)
     if (DISPLAZ_USE_PDAL)
@@ -219,16 +244,29 @@ if(WIN32)
     endif()
 endif()
 
-install(TARGETS displaz DESTINATION "${DISPLAZ_BIN_DIR}")
+if(APPLE)
+  set_target_properties(displaz PROPERTIES OUTPUT_NAME ${MACOSX_BUNDLE_NAME})
+else()
+  set_target_properties(displaz PROPERTIES OUTPUT_NAME "displaz")
+endif()
+
+
+if(APPLE)
+    install(TARGETS displaz
+            DESTINATION ${DISPLAZ_BIN_DIR})
+                        #BUNDLE DESTINATION ${INSTALL_RUNTIME_DIR}
+else()
+    install(TARGETS displaz
+            RUNTIME DESTINATION ${INSTALL_RUNTIME_DIR}
+            DESTINATION "${DISPLAZ_BIN_DIR}")
+endif()
 
 if (TARGET displaz_com)
-    install(TARGETS displaz_com DESTINATION "${DISPLAZ_BIN_DIR}")
+    install(TARGETS displaz_com RUNTIME DESTINATION ${INSTALL_RUNTIME_DIR}
+    DESTINATION "${DISPLAZ_BIN_DIR}")
 endif()
-
-if(WIN32)
-    include(DeployQt5)
-    install_qt5_executable(${DISPLAZ_BIN_DIR}/displaz${CMAKE_EXECUTABLE_SUFFIX})
-endif()
+#------------------------------------------------------------------------------
+add_subdirectory(lastinstall)
 
 #------------------------------------------------------------------------------
 # Experimental dvox utility
