@@ -143,8 +143,7 @@ above from the x64 cross tools command prompt.
 
 OSX
 ~~~
-
-The following commands may be used to build displaz packed as dmg on mac:
+The following commands may be used to build displaz packed as dmg on mac::
 
     # Get the source code
     git clone https://github.com/tillhainbach/displaz.git
